@@ -6,6 +6,7 @@ import cv2
 import tkinter as tk
 import time
 import csv
+import random
 from tkinter import ttk
 from PIL import ImageTk, Image
 
@@ -20,7 +21,6 @@ class go_nogo_Game(object):
         self.zone_y = 300
         self.strike = 1
         self.ball = 0
-        self.error = 0
         self.fp = 0
         self.fn = 0
         self.press = False
@@ -31,11 +31,15 @@ class go_nogo_Game(object):
         self.respond_time = []
         self.table = None
         self.refresh = None
+        self.status = []
+        self.ball_pos = []
 
-    '''def menu_picture(self):
+    '''
+    def menu_picture(self):
         self.btn = tk.Button(self.window, text="start", width=20, height=5)
         self.btn.place(x=330, y=230)
-        self.btn.config(command=self.tutorial)'''
+        self.btn.config(command=self.tutorial)
+    '''
 
     def tutorial(self):
         #self.btn.destroy()
@@ -62,21 +66,47 @@ class go_nogo_Game(object):
         '''
         self.canvas.pack()
 
-    def create_circle(self):
+    def create_all_circle(self):
+        for i in range(75):
+            oval_x = np.random.rand(1)[0] * 280 + 260 # 260 - 540
+            oval_y = np.random.rand(1)[0] * 280 + 160 # 160 - 440
+            position = (oval_x, oval_y)
+            self.ball_pos.append(position)
+        for i in range(25):
+            num = random.randint(1, 4)
+            if num == 1:
+                oval_x = np.random.rand(1)[0] * 400 + 200 # 200 - 600
+                oval_y = np.random.rand(1)[0] * 40 + 100 # 100 - 140
+                position = (oval_x, oval_y)
+                self.ball_pos.append(position)
+            elif num == 2:
+                oval_x = np.random.rand(1)[0] * 40 + 200 # 200 - 240
+                oval_y = np.random.rand(1)[0] * 300 + 150 # 150 - 450
+                position = (oval_x, oval_y)
+                self.ball_pos.append(position)
+            elif num == 3:
+                oval_x = np.random.rand(1)[0] * 40 + 560 # 560 - 600
+                oval_y = np.random.rand(1)[0] * 300 + 150 # 150 - 450
+                position = (oval_x, oval_y)
+                self.ball_pos.append(position)
+            elif num == 4:
+                oval_x = np.random.rand(1)[0] * 400 + 200 # 200 - 600
+                oval_y = np.random.rand(1)[0] * 40 + 460 # 460 - 500
+                position = (oval_x, oval_y)
+                self.ball_pos.append(position)
+        random.shuffle(self.ball_pos)
+        for i in range(len(self.ball_pos)):
+            ball_x, ball_y = self.ball_pos[i]
+            ball_status = self.detect_circle(ball_x, ball_y)
+            self.status.append(ball_status)
+            
+    def show_circle(self):
         # zone position : [x:250-550 , y:150-450]
         self.press = False
-        oval_x = np.random.rand(1)[0] * 400 + 200 # 200 - 600
-        oval_y = np.random.rand(1)[0] * 400 + 100 # 100 - 500
+        oval_x, oval_y = self.ball_pos[self.curr_step-1]
         oval_size = 10
-        ball_pos = (abs(oval_x - (self.zone_x - self.zone_size)) < 10) or (abs(oval_x - (self.zone_x + self.zone_size)) < 10) or \
-            (abs(oval_y - (self.zone_y - self.zone_size)) < 10) or (abs(oval_y - (self.zone_y - self.zone_size)) < 10)
-        while ball_pos:
-            oval_x = np.random.rand(1)[0] * 400 + 200 # 200 - 600
-            oval_y = np.random.rand(1)[0] * 400 + 100 # 100 - 500
-            ball_pos = (abs(oval_x - (self.zone_x - self.zone_size)) < 10) or (abs(oval_x - (self.zone_x + self.zone_size)) < 10) or \
-                (abs(oval_y - (self.zone_y - self.zone_size)) < 10) or (abs(oval_y - (self.zone_y - self.zone_size)) < 10)
         self.canvas.create_oval(oval_x - oval_size, oval_y - oval_size, oval_x + oval_size, oval_y + oval_size, fill='red', outline = "red", tags='circle') 
-        ball_status = self.detect_circle(oval_x, oval_y)
+        ball_status = self.status[self.curr_step-1]
         self.canvas.update()
         self.start_time = time.time()
         self.window.bind("<space>", lambda event:self.press_space(ball_status))
@@ -92,7 +122,7 @@ class go_nogo_Game(object):
                 self.fn += 1
         if self.curr_step < self.run_step:
             self.curr_step += 1
-            self.create_circle()
+            self.show_circle()
         else:
             self.show_result()
 
@@ -100,13 +130,17 @@ class go_nogo_Game(object):
         if self.press == False:
             self.end_time = time.time()
             self.record_time.append(self.end_time - self.start_time)
+            if ball_status == self.strike:
+                self.respond_time.append(self.end_time - self.start_time)
             self.press = True
             if ball_status == self.ball:
                 self.fp += 1
         self.canvas.delete('circle')
         self.canvas.update()
+        '''
         if ball_status == self.strike:
             self.respond_time.append(self.end_time - self.start_time)
+        '''
 
     def detect_circle(self, x, y):
         if x > self.zone_x - self.zone_size and x < self.zone_x + self.zone_size:
@@ -154,10 +188,14 @@ class go_nogo_Game(object):
         self.btn.config(command=self.save_result)
     
     def save_result(self):
-        f = open('result.txt', 'w')
-        f.write('編號  反應時間(秒)\n')
+        f = open('好球判斷成績.txt', 'w')
+        f.write('編號  反應時間(秒)  好壞球結果\n')
         for i in range(len(self.record_time)):
-            result = '{}    {}\n'.format(i+1, round(self.record_time[i], 3))
+            if self.status[i] == self.strike:
+                status = '好球'
+            elif self.status[i] == self.ball:
+                status = '壞球'
+            result = '{}    {}    {}\n'.format(i+1, round(self.record_time[i], 3), status)
             f.write(result)
             if i == len(self.record_time) - 1:
                 f.write('\n')     
@@ -171,9 +209,10 @@ class go_nogo_Game(object):
 
     def main(self):
         self.create_zone()
-        self.canvas.update() 
+        self.canvas.update()
+        self.create_all_circle() 
         self.canvas.after(1000)
-        self.create_circle()
+        self.show_circle()
         
 if __name__ == '__main__':
     window=tk.Tk()
